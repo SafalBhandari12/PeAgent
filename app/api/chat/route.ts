@@ -4,25 +4,32 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 
 const chatSchema = z.object({
-  prompt: z.string().min(1),
+  message: z.string().min(1),
 })
 
-export async function GET(request: Request) {
-  const { prompt } = chatSchema.parse(request.body)
-
+export async function POST(request: Request) {
   try {
+    const body = await request.json()
+    const { message } = chatSchema.parse(body)
+
+    // For now, let's just query some issues to give context to the LLM
+    // In a real scenario, the LLM might decide which query to run
     const coralData = await runCoralQuery(`
       SELECT *
       FROM github.issues
-      LIMIT 20
+      LIMIT 10
     `)
 
-    const response = await askLLM(prompt, coralData)
+    const response = await askLLM(message, coralData)
 
     return NextResponse.json({
       answer: response,
     })
-  } catch (err) {
-    return NextResponse.json(err)
+  } catch (err: any) {
+    console.error("Chat API error:", err)
+    return NextResponse.json(
+      { error: err.message || "Internal Server Error" },
+      { status: 500 }
+    )
   }
 }

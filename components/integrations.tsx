@@ -1,99 +1,132 @@
+"use client"
+
+import { Check, Clipboard, Terminal } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Check } from "lucide-react"
-import { headers } from "next/headers"
+import { useState } from "react"
 
 interface IntegrationProps {
   githubStatus: boolean
   notionStatus: boolean
 }
 
-export default async function Integrations({
+export default function Integrations({
   githubStatus,
   notionStatus,
 }: IntegrationProps) {
-  const githubClientId = process.env.GITHUB_CLIENT_ID
-  const notionClientId = process.env.NOTION_CLIENT_ID
+  const [copied, setCopied] = useState<string | null>(null)
 
-  const host = (await headers()).get("host")
-  const protocol = host?.includes("localhost") ? "http" : "https"
-  const origin = `${protocol}://${host}`
-
-  const githubRedirectUri = encodeURIComponent(`${origin}/api/callback/github`)
-  // Adding prompt=consent forces GitHub to show the authorization screen again even if already authorized
-  const githubUrl = `https://github.com/login/oauth/authorize?client_id=${githubClientId}&scope=repo,user&redirect_uri=${githubRedirectUri}&prompt=consent`
-
-  const notionRedirectUri = encodeURIComponent(`${origin}/api/callback/notion`)
-  const notionUrl = `https://api.notion.com/v1/oauth/authorize?client_id=${notionClientId}&response_type=code&owner=user&redirect_uri=${notionRedirectUri}`
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(id)
+    setTimeout(() => setCopied(null), 2000)
+  }
 
   return (
     <div className="flex w-80 flex-col gap-6 rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
       <div>
         <h2 className="text-xl font-bold tracking-tight">Integrations</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connect your external accounts.
+          Manage your local coral sources.
         </p>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex flex-col gap-2">
+      <div className="space-y-6">
+        {/* GitHub */}
+        <div className="space-y-3">
           <div className="flex items-center justify-between gap-4">
-            <span className="font-medium">GitHub</span>
+            <span className="font-semibold">GitHub</span>
             {githubStatus ? (
               <div className="flex items-center gap-1 font-medium text-green-600">
                 <Check className="h-4 w-4" />
-                <span>Done</span>
+                <span>Installed</span>
               </div>
             ) : (
-              <Button size="sm" asChild disabled={!githubClientId}>
-                {githubClientId ? (
-                  <a href={githubUrl}>Integrate</a>
-                ) : (
-                  <span>Config Missing</span>
-                )}
-              </Button>
+              <div className="text-xs font-medium text-yellow-600">
+                Not Installed
+              </div>
             )}
           </div>
-          {githubStatus && (
-            <div className="flex justify-end">
-              <a
-                href={githubUrl}
-                className="text-xs text-muted-foreground transition-colors hover:text-primary hover:underline"
-              >
-                Change Permissions
-              </a>
+          {!githubStatus && (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Run this command in your terminal to integrate:
+              </p>
+              <div className="group relative">
+                <code className="block rounded bg-muted p-2 pr-10 font-mono text-[10px] leading-tight">
+                  coral source add github --interactive
+                </code>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute top-1 right-1 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
+                  onClick={() =>
+                    copyToClipboard(
+                      "coral source add github --interactive",
+                      "github"
+                    )
+                  }
+                >
+                  {copied === "github" ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <Clipboard className="h-3 w-3" />
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="flex flex-col gap-2 border-t pt-4">
+        {/* Notion */}
+        <div className="space-y-3 border-t pt-4">
           <div className="flex items-center justify-between gap-4">
-            <span className="font-medium">Notion</span>
+            <span className="font-semibold">Notion</span>
             {notionStatus ? (
               <div className="flex items-center gap-1 font-medium text-green-600">
                 <Check className="h-4 w-4" />
-                <span>Done</span>
+                <span>Installed</span>
               </div>
             ) : (
-              <Button size="sm" asChild disabled={!notionClientId}>
-                {notionClientId ? (
-                  <a href={notionUrl}>Integrate</a>
-                ) : (
-                  <span>Config Missing</span>
-                )}
-              </Button>
+              <div className="text-xs font-medium text-yellow-600">
+                Not Installed
+              </div>
             )}
           </div>
-          {notionStatus && (
-            <div className="flex justify-end">
-              <a
-                href={notionUrl}
-                className="text-xs text-muted-foreground transition-colors hover:text-primary hover:underline"
-              >
-                Change Permissions
-              </a>
+          {!notionStatus && (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Run this command in your terminal to integrate:
+              </p>
+              <div className="group relative">
+                <code className="block rounded bg-muted p-2 pr-10 font-mono text-[10px] leading-tight">
+                  coral source add notion --interactive
+                </code>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute top-1 right-1 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
+                  onClick={() =>
+                    copyToClipboard(
+                      "coral source add notion --interactive",
+                      "notion"
+                    )
+                  }
+                >
+                  {copied === "notion" ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <Clipboard className="h-3 w-3" />
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 rounded bg-muted/30 p-2 text-[10px] text-muted-foreground">
+        <Terminal className="h-3 w-3" />
+        <span>Status updated from local CLI</span>
       </div>
     </div>
   )

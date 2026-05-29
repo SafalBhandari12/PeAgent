@@ -17,6 +17,7 @@ Data:
 ${context}
 `,
   })
+  console.log("LLM response:", response.text)
 
   return response.text
 }
