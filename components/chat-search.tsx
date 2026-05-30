@@ -12,8 +12,14 @@ export default function ChatSearch() {
   const [isLoading, setIsLoading] = useState(false)
   const [status, setStatus] = useState("")
   const [sqlTrace, setSqlTrace] = useState<string[]>([])
+  const [history, setHistory] = useState<{ role: string; content: string }[]>(
+    []
+  )
 
-  const submitRequest = async (body: Record<string, string>) => {
+  const submitRequest = async (
+    body: Record<string, any>,
+    currentHistory: { role: string; content: string }[] = []
+  ) => {
     setIsLoading(true)
     setAnswer("")
     setStatus("Initializing...")
@@ -23,7 +29,7 @@ export default function ChatSearch() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, messages: currentHistory }),
       })
 
       if (!res.body) throw new Error("No response body")
@@ -31,6 +37,8 @@ export default function ChatSearch() {
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ""
+      let fullAnswer = ""
+      let finalHistory = null
 
       const processLine = (line: string) => {
         if (!line.trim()) return
@@ -44,10 +52,15 @@ export default function ChatSearch() {
             setSqlTrace((queries) => [...queries, data.sql])
           }
           if (data.chunk) {
+            fullAnswer += data.chunk
             setAnswer((prev) => prev + data.chunk)
             setStatus("")
           }
+          if (data.history) {
+            finalHistory = data.history
+          }
           if (data.answer) {
+            fullAnswer = data.answer
             setAnswer(data.answer)
             setStatus("")
           }
@@ -74,6 +87,22 @@ export default function ChatSearch() {
       }
 
       processLine(buffer)
+
+      if (finalHistory) {
+        setHistory(finalHistory)
+      } else if (fullAnswer) {
+        setHistory((prev) => [
+          ...currentHistory,
+          {
+            role: "user",
+            content:
+              body.mode === "briefing"
+                ? "What should I work on?"
+                : body.message,
+          },
+          { role: "assistant", content: fullAnswer },
+        ])
+      }
     } catch (err) {
       setAnswer("Failed to fetch answer. Please try again.")
       setStatus("")
@@ -85,11 +114,42 @@ export default function ChatSearch() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (!query.trim()) return
-    void submitRequest({ mode: "chat", message: query })
+    const currentQuery = query
+    setQuery("")
+    void submitRequest({ mode: "chat", message: currentQuery }, history)
   }
 
   return (
     <div className="mt-8 w-full max-w-2xl">
+      {history.length > 0 && (
+        <div className="mb-6 space-y-4">
+          {history
+            .filter(
+              (msg) =>
+                (msg.role === "user" || msg.role === "assistant") && msg.content
+            )
+            .map((msg, i) => (
+              <div
+                key={i}
+                className={`rounded-lg p-4 ${
+                  msg.role === "user"
+                    ? "ml-8 bg-muted/30"
+                    : "mr-8 border bg-card shadow-sm"
+                }`}
+              >
+                <div className="mb-1 text-xs font-medium text-muted-foreground capitalize">
+                  {msg.role}
+                </div>
+                <div className="prose prose-sm max-w-none text-sm dark:prose-invert">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+
       <button
         type="button"
         onClick={() => void submitRequest({ mode: "briefing" })}

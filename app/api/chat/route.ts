@@ -6,13 +6,14 @@ import { z } from "zod"
 
 const chatSchema = z.object({
   message: z.string().min(1).optional(),
+  messages: z.array(z.any()).optional(),
   mode: z.enum(["chat", "briefing"]).default("chat"),
 })
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { message, mode } = chatSchema.parse(body)
+    const { message, messages, mode } = chatSchema.parse(body)
 
     const encoder = new TextEncoder()
     const stream = new ReadableStream({
@@ -35,23 +36,24 @@ export async function POST(request: Request) {
             const responseStream = summarizeMorningBriefing(
               JSON.stringify(data, null, 2)
             )
-            for await (const chunk of responseStream) {
-              sendEvent({ chunk })
+            for await (const event of responseStream) {
+              sendEvent(event)
             }
             return
           }
 
-          if (!message) {
-            throw new Error("A message is required for chat mode.")
+          if (!message && (!messages || messages.length === 0)) {
+            throw new Error("A message or messages are required for chat mode.")
           }
 
-          const responseStream = runCoralAgent(message, sources, {
+          const responseStream = runCoralAgent(message || "", sources, {
             onQuery: (sql, callNumber) => sendEvent({ sql, callNumber }),
             onStatus: (status) => sendEvent({ status }),
+            history: messages,
           })
 
-          for await (const chunk of responseStream) {
-            sendEvent({ chunk })
+          for await (const event of responseStream) {
+            sendEvent(event)
           }
         } catch (err: any) {
           sendEvent({ error: err.message || "Internal Server Error" })
