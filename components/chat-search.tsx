@@ -1,20 +1,93 @@
 "use client"
 
 import { useState } from "react"
-import { CalendarDays, Loader2, Mail, NotebookText, Search } from "lucide-react"
+import {
+  CalendarDays,
+  Loader2,
+  Mail,
+  Mic,
+  MicOff,
+  NotebookText,
+  Search,
+  Cpu,
+  Cloud,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
 export default function ChatSearch() {
   const [query, setQuery] = useState("")
+  const [provider, setProvider] = useState<"openrouter" | "ollama">(
+    "openrouter"
+  )
   const [answer, setAnswer] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isListening, setIsListening] = useState(false)
   const [status, setStatus] = useState("")
   const [sqlTrace, setSqlTrace] = useState<string[]>([])
   const [history, setHistory] = useState<{ role: string; content: string }[]>(
     []
   )
+
+  const [recognition, setRecognition] = useState<any>(null)
+
+  const handleVoiceInput = () => {
+    if (isListening) {
+      recognition?.stop()
+      setIsListening(false)
+      return
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      alert("Browser doesn't support speech recognition.")
+      return
+    }
+
+    const newRecognition = new SpeechRecognition()
+    newRecognition.lang = "en-US"
+    newRecognition.interimResults = false
+    newRecognition.maxAlternatives = 1
+
+    newRecognition.onstart = () => {
+      setIsListening(true)
+      setStatus("Listening...")
+    }
+
+    newRecognition.onresult = (event: any) => {
+      const speechToText = event.results[0][0].transcript
+      setQuery(speechToText)
+      setIsListening(false)
+      setStatus("")
+    }
+
+    newRecognition.onerror = (event: any) => {
+      console.error("Speech recognition error", event.error)
+      setIsListening(false)
+
+      if (event.error === "network") {
+        setStatus(
+          "Network error: Speech service unreachable. (If using Brave, enable 'Google Services for Push Messaging' in settings)"
+        )
+      } else if (event.error === "not-allowed") {
+        setStatus("Microphone access denied. Please check site permissions.")
+      } else if (event.error === "no-speech") {
+        setStatus("No speech detected. Try again.")
+      } else {
+        setStatus(`Speech Error: ${event.error}`)
+      }
+    }
+
+    newRecognition.onend = () => {
+      setIsListening(false)
+    }
+
+    setRecognition(newRecognition)
+    newRecognition.start()
+  }
 
   const submitRequest = async (
     body: Record<string, any>,
@@ -29,7 +102,7 @@ export default function ChatSearch() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, messages: currentHistory }),
+        body: JSON.stringify({ ...body, provider, messages: currentHistory }),
       })
 
       if (!res.body) throw new Error("No response body")
@@ -150,6 +223,27 @@ export default function ChatSearch() {
         </div>
       )}
 
+      <div className="mb-6 flex items-center justify-center gap-4 rounded-xl border bg-card p-2 shadow-sm">
+        <Button
+          variant={provider === "openrouter" ? "default" : "ghost"}
+          size="sm"
+          className="flex-1 gap-2"
+          onClick={() => setProvider("openrouter")}
+        >
+          <Cloud className="h-4 w-4" />
+          Cloud (OpenRouter)
+        </Button>
+        <Button
+          variant={provider === "ollama" ? "default" : "ghost"}
+          size="sm"
+          className="flex-1 gap-2"
+          onClick={() => setProvider("ollama")}
+        >
+          <Cpu className="h-4 w-4" />
+          Local (Ollama)
+        </Button>
+      </div>
+
       <button
         type="button"
         onClick={() => void submitRequest({ mode: "briefing" })}
@@ -193,6 +287,20 @@ export default function ChatSearch() {
             disabled={isLoading}
           />
         </div>
+        <Button
+          type="button"
+          variant={isListening ? "destructive" : "outline"}
+          onClick={handleVoiceInput}
+          disabled={isLoading}
+          className="flex gap-2"
+        >
+          {isListening ? (
+            <MicOff className="h-4 w-4" />
+          ) : (
+            <Mic className="h-4 w-4" />
+          )}
+          {isListening ? "Stop" : "Speak"}
+        </Button>
         <Button type="submit" disabled={isLoading}>
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ask"}
         </Button>

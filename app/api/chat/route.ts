@@ -1,6 +1,10 @@
 import { collectMorningBriefing } from "@/lib/briefing"
 import { getIntegratedSources } from "@/lib/coral"
-import { runCoralAgent, summarizeMorningBriefing } from "@/lib/openRouter"
+import {
+  runCoralAgent as runOpenRouterAgent,
+  summarizeMorningBriefing,
+} from "@/lib/openRouter"
+import { runCoralAgent as runOllamaAgent } from "@/lib/ollama"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
@@ -8,12 +12,13 @@ const chatSchema = z.object({
   message: z.string().min(1).optional(),
   messages: z.array(z.any()).optional(),
   mode: z.enum(["chat", "briefing"]).default("chat"),
+  provider: z.enum(["openrouter", "ollama"]).default("openrouter"),
 })
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { message, messages, mode } = chatSchema.parse(body)
+    const { message, messages, mode, provider } = chatSchema.parse(body)
 
     const encoder = new TextEncoder()
     const stream = new ReadableStream({
@@ -46,7 +51,9 @@ export async function POST(request: Request) {
             throw new Error("A message or messages are required for chat mode.")
           }
 
-          const responseStream = runCoralAgent(message || "", sources, {
+          const runAgent =
+            provider === "ollama" ? runOllamaAgent : runOpenRouterAgent
+          const responseStream = runAgent(message || "", sources, {
             onQuery: (sql, callNumber) => sendEvent({ sql, callNumber }),
             onStatus: (status) => sendEvent({ status }),
             history: messages,
