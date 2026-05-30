@@ -5,14 +5,12 @@ import { Button } from "@/components/ui/button"
 import { useState } from "react"
 
 interface IntegrationProps {
-  githubStatus: boolean
   notionStatus: boolean
   googleCalendarStatus: boolean
   gmailStatus: boolean
 }
 
 export default function Integrations({
-  githubStatus,
   notionStatus,
   googleCalendarStatus,
   gmailStatus,
@@ -35,60 +33,30 @@ export default function Integrations({
       </div>
 
       <div className="space-y-6">
-        {/* GitHub */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-4">
-            <span className="font-semibold">GitHub</span>
-            {githubStatus ? (
-              <div className="flex items-center gap-1 font-medium text-green-600">
-                <Check className="h-4 w-4" />
-                <span>Installed</span>
-              </div>
-            ) : (
-              <div className="text-xs font-medium text-yellow-600">
-                Not Installed
-              </div>
-            )}
-          </div>
-          {!githubStatus && (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                Run this command in your terminal to integrate:
-              </p>
-              <div className="group relative">
-                <code className="block rounded bg-muted p-2 pr-10 font-mono text-[10px] leading-tight">
-                  coral source add github --interactive
-                </code>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute top-1 right-1 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={() =>
-                    copyToClipboard(
-                      "coral source add github --interactive",
-                      "github"
-                    )
-                  }
-                >
-                  {copied === "github" ? (
-                    <Check className="h-3 w-3" />
-                  ) : (
-                    <Clipboard className="h-3 w-3" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Notion */}
-        <div className="space-y-3 border-t pt-4">
+        <div className="space-y-3">
           <div className="flex items-center justify-between gap-4">
             <span className="font-semibold">Notion</span>
             {notionStatus ? (
-              <div className="flex items-center gap-1 font-medium text-green-600">
-                <Check className="h-4 w-4" />
-                <span>Installed</span>
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1 font-medium text-green-600">
+                  <Check className="h-4 w-4" />
+                  <span>Installed</span>
+                </div>
+                <div className="group relative">
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-[10px] text-muted-foreground underline-offset-4 hover:underline"
+                    onClick={() =>
+                      copyToClipboard(
+                        "coral source add --interactive notion",
+                        "notion-update"
+                      )
+                    }
+                  >
+                    {copied === "notion-update" ? "Copied!" : "Update Config"}
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="text-xs font-medium text-yellow-600">
@@ -103,7 +71,7 @@ export default function Integrations({
               </p>
               <div className="group relative">
                 <code className="block rounded bg-muted p-2 pr-10 font-mono text-[10px] leading-tight">
-                  coral source add notion --interactive
+                  coral source add --interactive notion
                 </code>
                 <Button
                   size="icon"
@@ -111,7 +79,7 @@ export default function Integrations({
                   className="absolute top-1 right-1 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
                   onClick={() =>
                     copyToClipboard(
-                      "coral source add notion --interactive",
+                      "coral source add --interactive notion",
                       "notion"
                     )
                   }
@@ -149,7 +117,7 @@ export default function Integrations({
               </p>
               <div className="group relative">
                 <code className="block rounded bg-muted p-2 pr-10 font-mono text-[10px] leading-tight">
-                  coral source add google_calendar --interactive
+                  coral source add --interactive google_calendar
                 </code>
                 <Button
                   size="icon"
@@ -157,7 +125,7 @@ export default function Integrations({
                   className="absolute top-1 right-1 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
                   onClick={() =>
                     copyToClipboard(
-                      "coral source add google_calendar --interactive",
+                      "coral source add --interactive google_calendar",
                       "google_calendar"
                     )
                   }
@@ -191,24 +159,17 @@ export default function Integrations({
           {!gmailStatus && (
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground">
-                Gmail is a community source. Run this to integrate:
+                Gmail is a community source. Run Coral onboarding to integrate:
               </p>
               <div className="group relative">
                 <code className="block rounded bg-muted p-2 pr-10 font-mono text-[10px] leading-tight whitespace-pre-wrap">
-                  curl -sLO
-                  https://raw.githubusercontent.com/withcoral/coral/main/sources/community/gmail/manifest.yaml
-                  && coral source add -f manifest.yaml --interactive
+                  coral onboard
                 </code>
                 <Button
                   size="icon"
                   variant="ghost"
                   className="absolute top-1 right-1 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={() =>
-                    copyToClipboard(
-                      "curl -sLO https://raw.githubusercontent.com/withcoral/coral/main/sources/community/gmail/manifest.yaml && coral source add -f manifest.yaml --interactive",
-                      "gmail"
-                    )
-                  }
+                  onClick={() => copyToClipboard("coral onboard", "gmail")}
                 >
                   {copied === "gmail" ? (
                     <Check className="h-3 w-3" />

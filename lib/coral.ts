@@ -1,5 +1,7 @@
 import { execFile } from "child_process"
 
+const PERSONAL_SOURCE_NAMES = new Set(["gmail", "google_calendar", "notion"])
+
 const MUTATING_SQL_KEYWORDS =
   /\b(?:alter|attach|call|copy|create|delete|detach|drop|execute|grant|insert|merge|pragma|replace|revoke|truncate|update|vacuum)\b/i
 
@@ -56,18 +58,6 @@ export function runCoralQuery(query: string): Promise<string> {
   })
 }
 
-export async function getGithubUsername() {
-  const output = await runCoralQuery("SELECT login FROM github.user LIMIT 1")
-  const rows: unknown = JSON.parse(output)
-
-  if (!Array.isArray(rows)) {
-    return null
-  }
-
-  const login = rows[0]?.login
-  return typeof login === "string" && login.length > 0 ? login : null
-}
-
 export function getIntegratedSources(): Promise<string[]> {
   return new Promise((resolve) => {
     execFile("coral", ["source", "list"], (error, stdout) => {
@@ -87,7 +77,7 @@ export function getIntegratedSources(): Promise<string[]> {
       const sources = lines
         .slice(2)
         .map((line) => line.trim().split(/\s+/)[0])
-        .filter((name) => name && name !== "")
+        .filter((name) => PERSONAL_SOURCE_NAMES.has(name))
 
       resolve(sources)
     })

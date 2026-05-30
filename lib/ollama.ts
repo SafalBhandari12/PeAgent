@@ -28,8 +28,6 @@ const coralSqlTool: Tool = {
 }
 
 interface RunCoralAgentOptions {
-  githubUsername?: string | null
-  githubPreflightError?: string
   onQuery?: (query: string, callNumber: number) => void
   onStatus?: (status: string) => void
 }
@@ -46,22 +44,11 @@ function findPlaceholderValue(query: string) {
   return query.match(PLACEHOLDER_VALUE_PATTERN)?.[0]
 }
 
-function createSystemPrompt(
-  sources: string[],
-  githubUsername?: string | null,
-  githubPreflightError?: string
-) {
+function createSystemPrompt(sources: string[]) {
   const sourceList = sources.length > 0 ? sources.join(", ") : "none detected"
-  const githubContext = sources.includes("github")
-    ? `\nAuthenticated GitHub username: ${githubUsername ?? "unavailable"}.${
-        githubPreflightError
-          ? ` GitHub preflight error: ${githubPreflightError}`
-          : ""
-      }`
-    : ""
 
   return `You are a local personal assistant that answers questions using Coral SQL.
-The currently integrated Coral sources are: ${sourceList}.${githubContext}
+The currently integrated Coral sources are: ${sourceList}.
 
 Use the execute_coral_sql tool as many times as needed before answering. Prefer a short sequence of focused queries over a broad query that returns excessive context.
 
@@ -73,16 +60,16 @@ Coral metadata discovery playbook:
 - Query coral.inputs only when source configuration details are relevant.
 
 Rules:
-1. Use schema-qualified table names such as github.issues.
+1. Use schema-qualified table names such as gmail.threads, google_calendar.events, and notion.search.
 2. Inspect metadata instead of guessing table or column names.
 3. Include a reasonable LIMIT when retrieving lists or sampling rows.
 4. If Coral returns an error, inspect metadata or correct the SQL and try again.
 5. Answer the user's question directly once you have enough data.
 6. Never invent placeholder filter values such as 'your_username', 'your_team_id', or 'example_repo'. If a required filter value is missing, ask the user for that specific value instead of executing SQL with a placeholder.
 7. Do not repeat a failed query with different invented values. Use coral.tables and coral.filters to understand the table first.
-8. For the user's own GitHub repositories, use github.user_repos without a username filter. github.repos is a legacy team-permissions table and requires team_id, owner, and repo.
-9. Prefer github.search_repositories and the other github.search_* table functions for targeted GitHub searches. Inspect coral.table_functions for required arguments before calling them.
-10. If the authenticated GitHub username is available above, use that exact value when a GitHub search query requires the current user's username. Do not ask the user for it again.
+8. For inbox questions, use gmail.threads with label_ids = 'INBOX'. The installed Gmail source exposes thread snippets, not full message bodies.
+9. For Calendar questions, do not use time_min or time_max in SQL WHERE clauses. The installed connector advertises those filters but rejects them as SQL columns. Use start_date_time timestamp predicates and start_date predicates with bounded LIMITs.
+10. For Notion questions, start with notion.search or notion.search_objects(query => '...'), then use notion.block_children with a discovered block_id when page content is needed.
 11. If the available data cannot answer the question, clearly explain what is missing.`
 }
 
@@ -94,11 +81,7 @@ export async function runCoralAgent(
   const messages: Message[] = [
     {
       role: "system",
-      content: createSystemPrompt(
-        sources,
-        options.githubUsername,
-        options.githubPreflightError
-      ),
+      content: createSystemPrompt(sources),
     },
     {
       role: "user",
@@ -183,4 +166,27 @@ export async function runCoralAgent(
   })
 
   return finalResponse.message.content
+}
+
+export async function summarizeMorningBriefing(context: string) {
+  const response = await ollama.chat({
+    model: DEFAULT_MODEL,
+    think: false,
+    messages: [
+      {
+        role: "system",
+        content: `You are a local personal morning-planning assistant. Use only the supplied Gmail, Google Calendar, and Notion data.
+Return a concise ranked plan for today. Put urgent commitments and preparation first, then useful follow-ups.
+Separate signal from newsletters and promotional inbox noise. Gmail contains snippets only, so state uncertainty instead of inventing senders, subjects, or details.
+If Notion has no shared pages, briefly explain that pages must be shared with the Notion integration.
+If a source failed, mention the missing source without failing the whole briefing.`,
+      },
+      {
+        role: "user",
+        content: `What should I work on?\n\nLocal briefing data:\n${context}`,
+      },
+    ],
+  })
+
+  return response.message.content
 }

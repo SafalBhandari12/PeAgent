@@ -1,16 +1,18 @@
-import { getGithubUsername, getIntegratedSources } from "@/lib/coral"
-import { runCoralAgent } from "@/lib/ollama"
+import { collectMorningBriefing } from "@/lib/briefing"
+import { getIntegratedSources } from "@/lib/coral"
+import { runCoralAgent, summarizeMorningBriefing } from "@/lib/ollama"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
 const chatSchema = z.object({
-  message: z.string().min(1),
+  message: z.string().min(1).optional(),
+  mode: z.enum(["chat", "briefing"]).default("chat"),
 })
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { message } = chatSchema.parse(body)
+    const { message, mode } = chatSchema.parse(body)
 
     const encoder = new TextEncoder()
     const stream = new ReadableStream({
@@ -22,25 +24,26 @@ export async function POST(request: Request) {
         try {
           sendEvent({ status: "Gathering data sources..." })
           const sources = await getIntegratedSources()
-          let githubUsername: string | null | undefined
-          let githubPreflightError: string | undefined
 
-          if (sources.includes("github")) {
-            const githubUsernameQuery = "SELECT login FROM github.user LIMIT 1"
-            sendEvent({ status: "Resolving authenticated GitHub user..." })
-            sendEvent({ sql: githubUsernameQuery, phase: "preflight" })
+          if (mode === "briefing") {
+            sendEvent({ status: "Checking inbox, calendar, and notes..." })
+            const data = await collectMorningBriefing({
+              onQuery: (sql) => sendEvent({ sql, phase: "briefing" }),
+            })
+            sendEvent({ status: "Prioritizing your morning..." })
+            console.log("Morning briefing data:", data)
+            const response = await summarizeMorningBriefing(
+              JSON.stringify(data, null, 2)
+            )
+            sendEvent({ answer: response })
+            return
+          }
 
-            try {
-              githubUsername = await getGithubUsername()
-            } catch (error) {
-              githubPreflightError =
-                error instanceof Error ? error.message : String(error)
-            }
+          if (!message) {
+            throw new Error("A message is required for chat mode.")
           }
 
           const response = await runCoralAgent(message, sources, {
-            githubUsername,
-            githubPreflightError,
             onQuery: (sql, callNumber) => sendEvent({ sql, callNumber }),
             onStatus: (status) => sendEvent({ status }),
           })

@@ -4,7 +4,6 @@ import { getIntegratedSources } from "@/lib/coral"
 
 export default async function Page() {
   const integratedSources = await getIntegratedSources()
-  const githubStatus = integratedSources.includes("github")
   const notionStatus = integratedSources.includes("notion")
   const googleCalendarStatus = integratedSources.includes("google_calendar")
   const gmailStatus = integratedSources.includes("gmail")
@@ -15,7 +14,8 @@ export default async function Page() {
         <div>
           <h1 className="mb-4 text-2xl font-bold">Local Agent Dashboard</h1>
           <p>
-            Your personal assistant powered by local data and the Coral CLI.
+            Your private morning assistant, powered by local data and the Coral
+            CLI.
           </p>
 
           <ChatSearch />
@@ -27,7 +27,6 @@ export default async function Page() {
 
       <div className="shrink-0">
         <Integrations
-          githubStatus={githubStatus}
           notionStatus={notionStatus}
           googleCalendarStatus={googleCalendarStatus}
           gmailStatus={gmailStatus}
