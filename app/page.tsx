@@ -1,15 +1,13 @@
-import GoogleLoginButton from "@/components/googleLoginButton"
 import Integrations from "@/components/integrations"
 import ChatSearch from "@/components/chat-search"
-import { auth } from "@/auth"
 import { getIntegratedSources } from "@/lib/coral"
 
 export default async function Page() {
-  const session = await auth()
-
   const integratedSources = await getIntegratedSources()
   const githubStatus = integratedSources.includes("github")
   const notionStatus = integratedSources.includes("notion")
+  const googleCalendarStatus = integratedSources.includes("google_calendar")
+  const gmailStatus = integratedSources.includes("gmail")
 
   return (
     <div className="flex min-h-svh items-start justify-between gap-8 p-6">
@@ -20,17 +18,6 @@ export default async function Page() {
             Your personal assistant powered by local data and the Coral CLI.
           </p>
 
-          {session?.user ? (
-            <div className="mt-4 rounded-md border bg-muted/50 p-4">
-              <p className="font-medium">Welcome, {session.user.name}!</p>
-              <p className="text-muted-foreground">{session.user.email}</p>
-            </div>
-          ) : (
-            <div className="mt-4">
-              <GoogleLoginButton />
-            </div>
-          )}
-
           <ChatSearch />
         </div>
         <div className="pt-4 font-mono text-xs text-muted-foreground">
@@ -39,7 +26,12 @@ export default async function Page() {
       </div>
 
       <div className="shrink-0">
-        <Integrations githubStatus={githubStatus} notionStatus={notionStatus} />
+        <Integrations
+          githubStatus={githubStatus}
+          notionStatus={notionStatus}
+          googleCalendarStatus={googleCalendarStatus}
+          gmailStatus={gmailStatus}
+        />
       </div>
     </div>
   )

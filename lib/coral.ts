@@ -1,24 +1,76 @@
-import { exec } from "child_process"
+import { execFile } from "child_process"
+
+const MUTATING_SQL_KEYWORDS =
+  /\b(?:alter|attach|call|copy|create|delete|detach|drop|execute|grant|insert|merge|pragma|replace|revoke|truncate|update|vacuum)\b/i
+
+function stripSqlStringsAndComments(query: string) {
+  return query
+    .replace(/--.*$/gm, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/'(?:''|[^'])*'/g, "''")
+    .replace(/"(?:""|[^"])*"/g, '""')
+}
+
+export function validateReadOnlyCoralQuery(query: string) {
+  const trimmedQuery = query.trim()
+  if (!trimmedQuery) {
+    throw new Error("Coral SQL query cannot be empty.")
+  }
+
+  const queryWithoutTrailingSemicolon = trimmedQuery.replace(/;\s*$/, "")
+  const inspectableQuery = stripSqlStringsAndComments(
+    queryWithoutTrailingSemicolon
+  )
+
+  if (inspectableQuery.includes(";")) {
+    throw new Error("Only one Coral SQL statement is allowed.")
+  }
+
+  if (!/^\s*(?:select|with)\b/i.test(inspectableQuery)) {
+    throw new Error("Only read-only SELECT queries are allowed.")
+  }
+
+  if (MUTATING_SQL_KEYWORDS.test(inspectableQuery)) {
+    throw new Error("Mutating Coral SQL statements are not allowed.")
+  }
+
+  return queryWithoutTrailingSemicolon.trim()
+}
 
 export function runCoralQuery(query: string): Promise<string> {
-  // Clean query: remove newlines and extra spaces for CLI safety
-  const cleanQuery = query.replace(/\s+/g, " ").trim()
+  const readOnlyQuery = validateReadOnlyCoralQuery(query)
 
   return new Promise((resolve, reject) => {
-    exec(`coral sql "${cleanQuery}" --format json`, (error, stdout, stderr) => {
-      if (error) {
-        reject(stderr || error.message)
-        return
-      }
+    execFile(
+      "coral",
+      ["sql", readOnlyQuery, "--format", "json"],
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message))
+          return
+        }
 
-      resolve(stdout)
-    })
+        resolve(stdout)
+      }
+    )
   })
 }
 
+export async function getGithubUsername() {
+  const output = await runCoralQuery("SELECT login FROM github.user LIMIT 1")
+  const rows: unknown = JSON.parse(output)
+
+  if (!Array.isArray(rows)) {
+    return null
+  }
+
+  const login = rows[0]?.login
+  return typeof login === "string" && login.length > 0 ? login : null
+}
+
 export function getIntegratedSources(): Promise<string[]> {
-  return new Promise((resolve, reject) => {
-    exec("coral source list", (error, stdout, stderr) => {
+  return new Promise((resolve) => {
+    execFile("coral", ["source", "list"], (error, stdout) => {
       if (error || !stdout || stdout.includes("No sources configured")) {
         // If coral is not installed or returns error, return empty
         resolve([])

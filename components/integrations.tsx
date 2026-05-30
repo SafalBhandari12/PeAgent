@@ -7,11 +7,15 @@ import { useState } from "react"
 interface IntegrationProps {
   githubStatus: boolean
   notionStatus: boolean
+  googleCalendarStatus: boolean
+  gmailStatus: boolean
 }
 
 export default function Integrations({
   githubStatus,
   notionStatus,
+  googleCalendarStatus,
+  gmailStatus,
 }: IntegrationProps) {
   const [copied, setCopied] = useState<string | null>(null)
 
@@ -113,6 +117,100 @@ export default function Integrations({
                   }
                 >
                   {copied === "notion" ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <Clipboard className="h-3 w-3" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Google Calendar */}
+        <div className="space-y-3 border-t pt-4">
+          <div className="flex items-center justify-between gap-4">
+            <span className="font-semibold">Google Calendar</span>
+            {googleCalendarStatus ? (
+              <div className="flex items-center gap-1 font-medium text-green-600">
+                <Check className="h-4 w-4" />
+                <span>Installed</span>
+              </div>
+            ) : (
+              <div className="text-xs font-medium text-yellow-600">
+                Not Installed
+              </div>
+            )}
+          </div>
+          {!googleCalendarStatus && (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Run this command in your terminal to integrate:
+              </p>
+              <div className="group relative">
+                <code className="block rounded bg-muted p-2 pr-10 font-mono text-[10px] leading-tight">
+                  coral source add google_calendar --interactive
+                </code>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute top-1 right-1 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
+                  onClick={() =>
+                    copyToClipboard(
+                      "coral source add google_calendar --interactive",
+                      "google_calendar"
+                    )
+                  }
+                >
+                  {copied === "google_calendar" ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <Clipboard className="h-3 w-3" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Gmail */}
+        <div className="space-y-3 border-t pt-4">
+          <div className="flex items-center justify-between gap-4">
+            <span className="font-semibold">Gmail</span>
+            {gmailStatus ? (
+              <div className="flex items-center gap-1 font-medium text-green-600">
+                <Check className="h-4 w-4" />
+                <span>Installed</span>
+              </div>
+            ) : (
+              <div className="text-xs font-medium text-yellow-600">
+                Not Installed
+              </div>
+            )}
+          </div>
+          {!gmailStatus && (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Gmail is a community source. Run this to integrate:
+              </p>
+              <div className="group relative">
+                <code className="block rounded bg-muted p-2 pr-10 font-mono text-[10px] leading-tight whitespace-pre-wrap">
+                  curl -sLO
+                  https://raw.githubusercontent.com/withcoral/coral/main/sources/community/gmail/manifest.yaml
+                  && coral source add -f manifest.yaml --interactive
+                </code>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute top-1 right-1 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
+                  onClick={() =>
+                    copyToClipboard(
+                      "curl -sLO https://raw.githubusercontent.com/withcoral/coral/main/sources/community/gmail/manifest.yaml && coral source add -f manifest.yaml --interactive",
+                      "gmail"
+                    )
+                  }
+                >
+                  {copied === "gmail" ? (
                     <Check className="h-3 w-3" />
                   ) : (
                     <Clipboard className="h-3 w-3" />
