@@ -1,6 +1,6 @@
 import { collectMorningBriefing } from "@/lib/briefing"
 import { getIntegratedSources } from "@/lib/coral"
-import { runCoralAgent, summarizeMorningBriefing } from "@/lib/ollama"
+import { runCoralAgent, summarizeMorningBriefing } from "@/lib/openRouter"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
@@ -31,11 +31,13 @@ export async function POST(request: Request) {
               onQuery: (sql) => sendEvent({ sql, phase: "briefing" }),
             })
             sendEvent({ status: "Prioritizing your morning..." })
-            console.log("Morning briefing data:", data)
-            const response = await summarizeMorningBriefing(
+            console.log("Morning briefing data:", JSON.stringify(data, null, 2))
+            const responseStream = summarizeMorningBriefing(
               JSON.stringify(data, null, 2)
             )
-            sendEvent({ answer: response })
+            for await (const chunk of responseStream) {
+              sendEvent({ chunk })
+            }
             return
           }
 
@@ -43,12 +45,14 @@ export async function POST(request: Request) {
             throw new Error("A message is required for chat mode.")
           }
 
-          const response = await runCoralAgent(message, sources, {
+          const responseStream = runCoralAgent(message, sources, {
             onQuery: (sql, callNumber) => sendEvent({ sql, callNumber }),
             onStatus: (status) => sendEvent({ status }),
           })
 
-          sendEvent({ answer: response })
+          for await (const chunk of responseStream) {
+            sendEvent({ chunk })
+          }
         } catch (err: any) {
           sendEvent({ error: err.message || "Internal Server Error" })
         } finally {

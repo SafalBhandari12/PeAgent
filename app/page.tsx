@@ -4,9 +4,17 @@ import { getIntegratedSources } from "@/lib/coral"
 
 export default async function Page() {
   const integratedSources = await getIntegratedSources()
-  const notionStatus = integratedSources.includes("notion")
-  const googleCalendarStatus = integratedSources.includes("google_calendar")
-  const gmailStatus = integratedSources.includes("gmail")
+
+  // Initial health map for SSR
+  const initialHealth: Record<string, any> = {
+    notion: integratedSources.includes("notion")
+      ? "installed"
+      : "not_installed",
+    google_calendar: integratedSources.includes("google_calendar")
+      ? "installed"
+      : "not_installed",
+    gmail: integratedSources.includes("gmail") ? "installed" : "not_installed",
+  }
 
   return (
     <div className="flex min-h-svh items-start justify-between gap-8 p-6">
@@ -26,11 +34,7 @@ export default async function Page() {
       </div>
 
       <div className="shrink-0">
-        <Integrations
-          notionStatus={notionStatus}
-          googleCalendarStatus={googleCalendarStatus}
-          gmailStatus={gmailStatus}
-        />
+        <Integrations initialHealth={initialHealth} />
       </div>
     </div>
   )

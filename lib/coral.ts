@@ -58,6 +58,40 @@ export function runCoralQuery(query: string): Promise<string> {
   })
 }
 
+export type SourceHealth = "installed" | "error" | "not_installed"
+
+export async function getHealthcheck(): Promise<Record<string, SourceHealth>> {
+  const sources = await getIntegratedSources()
+  const health: Record<string, SourceHealth> = {}
+
+  // Initialize with not_installed
+  for (const name of PERSONAL_SOURCE_NAMES) {
+    health[name] = "not_installed"
+  }
+
+  // Check health for each integrated source
+  await Promise.all(
+    sources.map(async (name) => {
+      try {
+        await new Promise((resolve, reject) => {
+          execFile("coral", ["source", "test", name], (error) => {
+            if (error) {
+              reject(error)
+              return
+            }
+            resolve(true)
+          })
+        })
+        health[name] = "installed"
+      } catch (e) {
+        health[name] = "error"
+      }
+    })
+  )
+
+  return health
+}
+
 export function getIntegratedSources(): Promise<string[]> {
   return new Promise((resolve) => {
     execFile("coral", ["source", "list"], (error, stdout) => {

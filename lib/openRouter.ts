@@ -1,13 +1,22 @@
-import ollama, { type Message, type Tool } from "ollama"
+import OpenAI from "openai"
 import { runCoralQuery } from "@/lib/coral"
 
-const DEFAULT_MODEL = "qwen3:1.7b-q4_K_M"
+const openai = new OpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY || "",
+  defaultHeaders: {
+    "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+    "X-OpenRouter-Title": "Personal Agent",
+  },
+})
+
+const MODEL = "qwen/qwen3-8b"
 const MAX_CORAL_CALLS = 8
 const MAX_TOOL_RESULT_LENGTH = 12_000
 const PLACEHOLDER_VALUE_PATTERN =
   /\b(?:your|example|placeholder|unknown)_(?:username|user|owner|repo|repository|org|organization|team|team_id|id)\b|<[^>]+>/i
 
-const coralSqlTool: Tool = {
+const coralSqlTool: OpenAI.Chat.ChatCompletionTool = {
   type: "function",
   function: {
     name: "execute_coral_sql",
@@ -67,9 +76,9 @@ Rules:
 5. Answer the user's question directly once you have enough data.
 6. Never invent placeholder filter values such as 'your_username', 'your_team_id', or 'example_repo'. If a required filter value is missing, ask the user for that specific value instead of executing SQL with a placeholder.
 7. Do not repeat a failed query with different invented values. Use coral.tables and coral.filters to understand the table first.
-8. For inbox questions, use gmail.threads with label_ids = 'INBOX'. The installed Gmail source exposes thread snippets, not full message bodies.
+8. For inbox questions, use gmail.threads with label_ids = 'INBOX'. Use gmail.message with a required id filter to retrieve the full content and details of a specific message.
 9. For Calendar questions, do not use time_min or time_max in SQL WHERE clauses. The installed connector advertises those filters but rejects them as SQL columns. Use start_date_time timestamp predicates and start_date predicates with bounded LIMITs.
-10. For Notion questions, start with notion.search or notion.search_objects(query => '...'), then use notion.block_children with a discovered block_id when page content is needed.
+10. For Notion questions, start with notion.search or notion.search_objects(query => '...'), then use notion.pages with a discovered page_id when page content is needed.
 11. If the available data cannot answer the question, clearly explain what is missing.`
 }
 
@@ -78,10 +87,10 @@ export async function* runCoralAgent(
   sources: string[],
   options: RunCoralAgentOptions = {}
 ) {
-  const messages: Message[] = [
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
       role: "system",
-      content: createSystemPrompt(sources),
+      content: "/no_think\n" + createSystemPrompt(sources),
     },
     {
       role: "user",
@@ -93,18 +102,19 @@ export async function* runCoralAgent(
 
   for (; coralCallCount < MAX_CORAL_CALLS; ) {
     options.onStatus?.("Planning next Coral query...")
-    const response = await ollama.chat({
-      model: DEFAULT_MODEL,
-      think: false,
+    const response = await openai.chat.completions.create({
+      model: MODEL,
       messages,
       tools: [coralSqlTool],
     })
 
-    messages.push(response.message)
-    const toolCalls = response.message.tool_calls ?? []
+    const modelMessage = response.choices[0].message
+    messages.push(modelMessage)
+
+    const toolCalls = modelMessage.tool_calls || []
 
     if (toolCalls.length === 0) {
-      yield response.message.content
+      if (modelMessage.content) yield modelMessage.content
       return
     }
 
@@ -113,12 +123,16 @@ export async function* runCoralAgent(
         break
       }
 
+      const functionCall = "function" in toolCall ? toolCall.function : null
+      if (!functionCall) continue
+
       coralCallCount += 1
-      const query = toolCall.function.arguments.query
+      const args = JSON.parse(functionCall.arguments)
+      const query = args.query
       let toolResult: string
 
       if (
-        toolCall.function.name !== "execute_coral_sql" ||
+        functionCall.name !== "execute_coral_sql" ||
         typeof query !== "string"
       ) {
         toolResult =
@@ -147,7 +161,7 @@ export async function* runCoralAgent(
 
       messages.push({
         role: "tool",
-        tool_name: toolCall.function.name,
+        tool_call_id: toolCall.id,
         content: truncateToolResult(toolResult),
       })
     }
@@ -160,26 +174,27 @@ export async function* runCoralAgent(
       "The Coral query limit has been reached. Do not request more tools. Answer the user using the data gathered so far, and mention any missing information.",
   })
 
-  const stream = await ollama.chat({
-    model: DEFAULT_MODEL,
-    think: false,
+  const stream = await openai.chat.completions.create({
+    model: MODEL,
     messages,
     stream: true,
   })
 
-  for await (const part of stream) {
-    yield part.message.content
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content || ""
+    if (content) yield content
   }
 }
 
 export async function* summarizeMorningBriefing(context: string) {
-  const stream = await ollama.chat({
-    model: DEFAULT_MODEL,
-    think: false,
+  const stream = await openai.chat.completions.create({
+    model: MODEL,
     messages: [
       {
         role: "system",
-        content: `You are a local personal morning-planning assistant. Use only the supplied Gmail, Google Calendar, and Notion data.
+        content: `/no_think
+You are a local personal morning-planning assistant. Use only the supplied Gmail, Google Calendar, and Notion data.
+The Notion data now contains full page objects (raw content) including all properties for all available pages.
 Return a concise ranked plan for today. Put urgent commitments and preparation first, then useful follow-ups.
 Separate signal from newsletters and promotional inbox noise. Gmail contains snippets only, so state uncertainty instead of inventing senders, subjects, or details.
 If Notion has no shared pages, briefly explain that pages must be shared with the Notion integration.
@@ -193,7 +208,8 @@ If a source failed, mention the missing source without failing the whole briefin
     stream: true,
   })
 
-  for await (const part of stream) {
-    yield part.message.content
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content || ""
+    if (content) yield content
   }
 }

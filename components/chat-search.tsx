@@ -43,6 +43,10 @@ export default function ChatSearch() {
           if (data.sql) {
             setSqlTrace((queries) => [...queries, data.sql])
           }
+          if (data.chunk) {
+            setAnswer((prev) => prev + data.chunk)
+            setStatus("")
+          }
           if (data.answer) {
             setAnswer(data.answer)
             setStatus("")

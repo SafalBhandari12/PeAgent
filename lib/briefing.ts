@@ -2,8 +2,8 @@ import { runCoralQuery } from "@/lib/coral"
 
 const GMAIL_QUERY =
   "SELECT id, snippet FROM gmail.threads WHERE label_ids = 'INBOX' LIMIT 30"
-const NOTION_QUERY =
-  "SELECT id, object, last_edited_time, properties FROM notion.search ORDER BY last_edited_time DESC LIMIT 8"
+const NOTION_PAGES_QUERY =
+  "SELECT id, properties FROM notion.search WHERE object = 'page' LIMIT 100"
 
 interface BriefingSection {
   error?: string
@@ -16,7 +16,7 @@ export interface MorningBriefingData {
   gmail: BriefingSection
   calendar: BriefingSection
   notion: BriefingSection & {
-    blocks: Array<{ pageId: string; rows: unknown[]; error?: string }>
+    pages: Array<{ pageId: string; raw: any; error?: string }>
   }
 }
 
@@ -48,8 +48,8 @@ function createCalendarQueries(now: Date) {
   ]
 }
 
-function createNotionBlocksQuery(pageId: string) {
-  return `SELECT id, type, has_children, rich_text, last_edited_time FROM notion.block_children WHERE block_id = '${escapeSqlLiteral(pageId)}' LIMIT 30`
+function createNotionPageContentQuery(pageId: string) {
+  return `SELECT raw FROM notion.pages WHERE page_id = '${escapeSqlLiteral(pageId)}'`
 }
 
 async function queryRows(
@@ -86,7 +86,7 @@ export async function collectMorningBriefing({
   const [gmail, calendar, notion] = await Promise.all([
     collectSection([GMAIL_QUERY], onQuery),
     collectSection(createCalendarQueries(now), onQuery),
-    collectSection([NOTION_QUERY], onQuery),
+    collectSection([NOTION_PAGES_QUERY], onQuery),
   ])
 
   const notionPageIds = notion.rows
@@ -95,19 +95,23 @@ export async function collectMorningBriefing({
       return typeof row.id === "string" ? row.id : null
     })
     .filter((id): id is string => Boolean(id))
-    .slice(0, 3)
 
-  const blocks = await Promise.all(
+  const pages = await Promise.all(
     notionPageIds.map(async (pageId) => {
       try {
+        const rows = await queryRows(
+          createNotionPageContentQuery(pageId),
+          onQuery
+        )
+        const raw = rows.length > 0 ? (rows[0] as any).raw : null
         return {
           pageId,
-          rows: await queryRows(createNotionBlocksQuery(pageId), onQuery),
+          raw: typeof raw === "string" ? JSON.parse(raw) : raw,
         }
       } catch (error) {
         return {
           pageId,
-          rows: [],
+          raw: null,
           error: error instanceof Error ? error.message : String(error),
         }
       }
@@ -119,6 +123,6 @@ export async function collectMorningBriefing({
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     gmail,
     calendar,
-    notion: { ...notion, blocks },
+    notion: { ...notion, pages },
   }
 }
