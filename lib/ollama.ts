@@ -67,7 +67,7 @@ Rules:
 5. Answer the user's question directly once you have enough data.
 6. Never invent placeholder filter values such as 'your_username', 'your_team_id', or 'example_repo'. If a required filter value is missing, ask the user for that specific value instead of executing SQL with a placeholder.
 7. Do not repeat a failed query with different invented values. Use coral.tables and coral.filters to understand the table first.
-8. For inbox questions, use gmail.threads with label_ids = 'INBOX'. The installed Gmail source exposes thread snippets, not full message bodies.
+8. For inbox questions, use gmail.threads with label_ids = 'INBOX' or q = 'is:unread newer_than:2d'. Use gmail.message with a required id filter to retrieve the full content and details of a specific message.
 9. For Calendar questions, do not use time_min or time_max in SQL WHERE clauses. The installed connector advertises those filters but rejects them as SQL columns. Use start_date_time timestamp predicates and start_date predicates with bounded LIMITs.
 10. For Notion questions, start with notion.search or notion.search_objects(query => '...'), then use notion.block_children with a discovered block_id when page content is needed.
 11. If the available data cannot answer the question, clearly explain what is missing.`

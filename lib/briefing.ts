@@ -1,7 +1,7 @@
 import { runCoralQuery } from "@/lib/coral"
 
 const GMAIL_QUERY =
-  "SELECT id, snippet FROM gmail.threads WHERE label_ids = 'INBOX' LIMIT 30"
+  "SELECT id, snippet FROM gmail.threads WHERE q = 'is:unread newer_than:2d' LIMIT 30"
 const NOTION_PAGES_QUERY =
   "SELECT id, properties FROM notion.search WHERE object = 'page' LIMIT 100"
 

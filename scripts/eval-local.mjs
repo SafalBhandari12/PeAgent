@@ -47,7 +47,7 @@ await check("source health: google_calendar", () =>
 await check("source health: notion", () => coral("source", "test", "notion"))
 await check("briefing query: inbox snippets", () =>
   query(
-    "SELECT id, snippet FROM gmail.threads WHERE label_ids = 'INBOX' LIMIT 30"
+    "SELECT id, snippet FROM gmail.threads WHERE q = 'is:unread newer_than:2d' LIMIT 30"
   )
 )
 await check("briefing query: timed calendar events", () =>

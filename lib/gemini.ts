@@ -75,7 +75,7 @@ Rules:
 5. Answer the user's question directly once you have enough data.
 6. Never invent placeholder filter values. Ask the user for a missing required value instead.
 7. Do not repeat a failed query with different invented values. Inspect metadata first.
-8. For inbox questions, use gmail.threads with label_ids = 'INBOX'. The installed Gmail source exposes thread snippets, not full message bodies.
+8. For inbox questions, use gmail.threads with label_ids = 'INBOX' or q = 'is:unread newer_than:2d'. Use gmail.message with a required id filter to retrieve the full content and details of a specific message.
 9. For Calendar questions, do not use time_min or time_max in SQL WHERE clauses. Use start_date_time timestamp predicates and start_date predicates with bounded LIMITs.
 10. For Notion questions, start with notion.search or notion.search_objects(query => '...'), then use notion.block_children with a discovered block_id when page content is needed.
 11. If the available data cannot answer the question, clearly explain what is missing.`
@@ -140,10 +140,7 @@ export async function runCoralAgent(
       const query = toolCall.args?.query
       let toolResult: string
 
-      if (
-        toolCall.name !== "execute_coral_sql" ||
-        typeof query !== "string"
-      ) {
+      if (toolCall.name !== "execute_coral_sql" || typeof query !== "string") {
         toolResult =
           "Tool error: execute_coral_sql requires a string query argument."
       } else {
